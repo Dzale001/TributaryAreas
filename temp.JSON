@@ -1,0 +1,77 @@
+{
+  "5D7": {
+    "intersecano": [
+      "358",
+      "359",
+      "35A",
+      "35E",
+      "35F",
+      "36D"
+    ],
+    "orditura": "Y",
+    "tipo": "stanza"
+  },
+  "5D8": {
+    "intersecano": [
+      "35B",
+      "35C",
+      "35D",
+      "369",
+      "36A",
+      "36D"
+    ],
+    "orditura": "Y",
+    "tipo": "stanza"
+  },
+  "5D9": {
+    "intersecano": [
+      "35F",
+      "360",
+      "361",
+      "36B",
+      "36E",
+      "370"
+    ],
+    "orditura": "Y",
+    "tipo": "stanza"
+  },
+  "5DA": {
+    "intersecano": [
+      "361",
+      "362",
+      "363",
+      "364",
+      "365",
+      "366",
+      "367",
+      "368",
+      "36E",
+      "36F",
+      "370"
+    ],
+    "orditura": "Y",
+    "tipo": "stanza"
+  },
+  "5DC": {
+    "intersecano": [
+      "368",
+      "369",
+      "36A",
+      "36C",
+      "36D",
+      "36E",
+      "36F"
+    ],
+    "orditura": "Y",
+    "tipo": "stanza"
+  },
+  "5DB": {
+    "intersecano": [
+      "36B",
+      "36C",
+      "36E"
+    ],
+    "orditura": "X",
+    "tipo": "scale"
+  }
+}
