@@ -2,8 +2,9 @@ import ezdxf
 import math
 import json
 import pandas as pd
-from plotting import plotting
-from cutting import multi_slash, flatten_voronoi, flatten_single_level, to_polygon, unionized, fusion, point_in_polygon, polygon_in_polygon, segments_intersect, polygons_intersect, more_xy, split_rooms_by_orditura, multi_slash_anisotropic, multi_slash_weighted
+from plotting import plotting, init_plot, update_plot, show
+from cutting import multi_slash, flatten_voronoi, flatten_single_level, to_polygon, unionized, fusion, point_in_polygon, polygon_in_polygon, segments_intersect, polygons_intersect, more_xy, split_rooms_by_orditura, multi_slash_anisotropic, multi_slash_weighted, buffer_overlapping, clip_region_to_boundaries
+
 from collections import defaultdict
 
 
@@ -115,17 +116,17 @@ for r_key, r_value in other_polylines.items():
     sub_other_data["tipo"] = "scale"
     other_data[r_key] = sub_other_data
 
-total_rooms_polylines = room_polylines | stairs_polylines | other_polylines
-total_rooms_data = rooms_data | stairs_data | other_data
+total_rooms_polylines = room_polylines# | stairs_polylines | other_polylines
+total_rooms_data = rooms_data# | stairs_data | other_data
 
 
-with open("temp.JSON", "w") as f:
-    json.dump(total_rooms_data, f, indent=2)
+#with open("temp.JSON", "w") as f:
+    #json.dump(total_rooms_data, f, indent=2)
         
 #DA CONTROLLARE SE CI SONO ELEMENTI O TESTI CHE NON SONO DENTRO LE POLILINEE PERIMETRALI
 
-with open("data.JSON", "w") as f:
-    json.dump(data, f, indent=2)
+#with open("data.JSON", "w") as f:
+    #json.dump(data, f, indent=2)
 
 
 ############# M A I N - L O O P #############
@@ -138,34 +139,72 @@ if anisotropic:
 else:
     voronoi_areas = multi_slash(total_rooms_polylines, total_rooms_data, struct_polylines)
 
+struct_buffer_polygons = {}
+BUFFER = 30
+for key, value in struct_polylines.items():
+    struct_buffer_polygons[key] = to_polygon(struct_polylines[key]["points"]).buffer(BUFFER,join_style="mitre",  mitre_limit=100)
+
+
+#fig1, ax1 = init_plot()
+#update_plot(ax, struct_buffer_polygons.values())
+truebuffer = buffer_overlapping(struct_polylines, struct_buffer_polygons)
+#update_plot(ax1, truebuffer.values(), pause=1)
+
+all_buffers = unionized(list(truebuffer.values()))
+
 struct_regions = {}
 for element in struct_polylines:
     stuff = []
     struct_poly = to_polygon(struct_polylines[element]["points"]) # -> qui potrei aggiungere l'area con offset
     stuff.append(struct_poly)
+    stuff.append(truebuffer[element])
+    other_buffers = all_buffers.difference(truebuffer[element])
     for room, cell_by_element in voronoi_areas.items():
         for struct, cell in cell_by_element.items():
             if struct == element:
+                cell = cell.difference(other_buffers)
                 stuff.append(cell)
     struct_regions[element] = stuff
 
+#struct regions contiene l'elemento strutturale e tutte le celle voronoi ad esso associate
 region_polygons = {}
 # in pratica, arrivano gli elementi strutturali e le celle separate e unionized le unisce, poi fusion trasforma in multipoligoni in poligoni con meno intersezioni possibile
 # Quindi se voglio aggiungere o togliere qualcosa devo farlo qui?
 for struct, cells in struct_regions.items():
     region_polygons[struct] = unionized(cells) ###################################################
+
+#update_plot(ax1, region_polygons.values(), pause=1)
+
 for key, value in region_polygons.items():    
     region_polygons[key] = fusion(value)
 
 
+region_polygons = clip_region_to_boundaries(region_polygons, bound_polylines, struct_polylines)
+
+#update_plot(ax1, region_polygons.values())
+#show()
+
 #voronoi_flat = flatten_voronoi(voronoi_areas)
 
 
+for boundary, polygon in bound_polylines.items():
+    polygon = to_polygon(polygon["points"])
+
 voronoi_flat = flatten_single_level(region_polygons)
 
+
+print(region_polygons)
 
 plotting(bound_polylines=bound_polylines, struct_polylines=struct_polylines, mtexts=mtexts, voronoi=voronoi_flat)
 
 
 ## L' IDEA è QUELLA DI AGGIUNGERE UN OFFSET A OGNI AREA PRIMA DI FARE QUALNUNQUE CALCOLO E POI FARE QUALUNQUE CALCOLO, MA C
 # O FORSE è MEGLIO, QUANDO AGGIUNGIAMO L'AREA A TUTTE LE REGIONI, AGGIUNGERE QUELLA FINTA CON L'OFFSET? BOH
+
+### Aggiungiamo alla lista di aree da unire un area definita così:
+# Ci calcoliamo inizialmente un vettore che contiene tutte gli elementi strutturali con buffer + 50 ✓
+# Nel loop cerchiamo questo elemento e lo modifichiamo come segue:
+# A questo buffer togliamo ogni intersezione con altri elementi strutturali
+# Prendiamo l'intersezione di questo buffer con tutti li altri buffer
+# Da questa infersezione togliamo l'elemento strutturale di appartenenza e rimaniamo con l'intersezione pura buffer - buffer
+# Togliamo questa intersezione pura dal nostro buffer, che andiamo a inserire nelle aree da unire

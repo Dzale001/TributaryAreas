@@ -3,7 +3,7 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from matplotlib.patches import Polygon as MplPolygon
 import numpy as np
-
+from shapely.geometry import Polygon, MultiPolygon
 fig, ax = plt.subplots(figsize = (12, 10))
 colors = {
     "bound": "blue",
@@ -11,6 +11,36 @@ colors = {
     "text" :"green",
     "voronoi":"black"
 }
+
+def _iter_polygons(geom):
+    if isinstance(geom, Polygon):
+        yield geom
+    elif isinstance(geom, MultiPolygon):
+        yield from geom.geoms
+    # altri tipi (GeometryCollection, None, geometrie vuote) vengono ignorati
+
+def init_plot():
+    plt.ion()
+    fig, ax = plt.subplots(figsize = (12, 10))
+    ax.set_aspect("equal")
+    return fig, ax
+
+def update_plot(ax, geometries, pause=1):
+    ax.clear()
+    ax.set_aspect("equal")
+    for geom in geometries:
+        if geom is None or geom.is_empty:
+            continue
+        for poly in _iter_polygons(geom):
+            x, y = poly.exterior.xy
+            ax.fill(x, y, alpha=0.5, edgecolor="black")
+    plt.draw()
+    plt.pause(pause)
+
+def show():
+    plt.ioff()
+    plt.show()
+
 def plotting(bound_polylines, struct_polylines, mtexts, voronoi):
     for handle, data in bound_polylines.items():
         points = np.array(data["points"])

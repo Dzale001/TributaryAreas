@@ -54,7 +54,6 @@
   },
   "5DC": {
     "intersecano": [
-      "368",
       "369",
       "36A",
       "36C",
@@ -62,7 +61,7 @@
       "36E",
       "36F"
     ],
-    "orditura": "Y",
+    "orditura": "X",
     "tipo": "stanza"
   },
   "5DB": {

@@ -3,7 +3,7 @@ from shapely.affinity import scale as affine_scale
 from shapely.ops import voronoi_diagram, unary_union, split
 from scipy.spatial import Voronoi
 import numpy as np
-
+from plotting import update_plot
 """
 def slash(data, bound_polylines, struct_polylines):
     voronoi_areas = {}
@@ -84,7 +84,7 @@ def multi_slash(total_rooms_polylines, total_rooms_data, struct_polylines):
                     best_element = element
             
             if best_element is None:
-                print("here")
+                
                 continue
 
             # Ora clippiamo sulla forma reale del boundary
@@ -185,7 +185,7 @@ def flatten_voronoi(voronoi_areas):
     return flat
 
 def to_polygon(stuff):
-    return Polygon(stuff).buffer(10)
+    return Polygon(stuff)#.buffer(20, join_style="mitre", mitre_limit=100)
 
 def unionized(stuff):
     return unary_union(stuff)
@@ -421,7 +421,7 @@ def split_rooms_by_orditura(total_rooms_polylines, total_rooms_data, struct_poly
 
     return new_polylines, new_data
 
-def multi_slash_anisotropic(total_rooms_polylines, total_rooms_data, struct_polylines, stretch_factor=3.0):
+def multi_slash_anisotropic(total_rooms_polylines, total_rooms_data, struct_polylines, stretch_factor=2.5):
     voronoi_areas = {}
 
     for boundary in total_rooms_polylines:
@@ -554,3 +554,56 @@ def multi_slash_weighted(total_rooms_polylines, total_rooms_data, struct_polylin
 
     return voronoi_areas
 
+
+def buffer_overlapping(struct_polylines, struct_buffer_polygons, fig=None, ax=None):
+    # buffer_overlapping prende il dizionario delle polilinee, le polilinee con i buffer, ebbasta al momento
+    true_buffer_polygons = {}
+    struct_poly = {}
+    for element in struct_polylines:
+        struct_poly[element] = to_polygon(struct_polylines[element]["points"])
+    
+    #update_plot(ax, struct_poly.values())
+    for false_struct, false_polygon in struct_buffer_polygons.items():
+        for true_struct, true_polygon in struct_poly.items():
+            if false_struct != true_struct and not false_polygon.difference(true_polygon).is_empty: #possibile errore
+                result = false_polygon.difference(true_polygon)
+                false_polygon = result
+        true_buffer_polygons[false_struct] = result
+    #update_plot(ax, true_buffer_polygons.values())
+    diff_buffer = {}
+    for id_1, polygon_1 in true_buffer_polygons.items():
+        inter = []
+        for id_2, polygon_2 in true_buffer_polygons.items():
+            if id_1 != id_2 and not polygon_1.intersection(polygon_2).is_empty:
+                inter.append(polygon_1.intersection(polygon_2))
+            #result = result.difference(struct_poly[id_1]) #possibile errore
+            diff_buffer[id_1] = unary_union(inter)
+        #update_plot(ax, diff_buffer.values(), pause=0.5)
+    
+    for id, polygon in true_buffer_polygons.items():
+            try:
+                true_buffer_polygons[id] = true_buffer_polygons[id].difference(diff_buffer[id])
+            except KeyError:
+                continue
+            #update_plot(ax, true_buffer_polygons.values(), pause=0.5)
+    
+    
+    return true_buffer_polygons
+
+def clip_region_to_boundaries(region_polygons, bound_polylines, struct_polylines):
+    boundary_polys = {b: to_polygon(v["points"]) for b, v in bound_polylines.items()}
+
+    clipped = {}
+    for element, region in region_polygons.items():
+        struct_poly = to_polygon(struct_polylines[element]["points"])
+
+        owning = [bp for bp in boundary_polys.values() if bp.intersects(struct_poly)]
+
+        if not owning:
+            clipped[element] = region  # non appartiene a nessuna boundary nota: nessun clip
+            continue
+
+        allowed_area = unary_union(owning)
+        clipped[element] = region.intersection(allowed_area)
+
+    return clipped
