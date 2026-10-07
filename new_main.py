@@ -3,7 +3,7 @@ import math
 import json
 import pandas as pd
 from plotting import plotting, init_plot, update_plot, show
-from cutting import multi_slash, flatten_voronoi, flatten_single_level, to_polygon, unionized, fusion, point_in_polygon, polygon_in_polygon, segments_intersect, polygons_intersect, more_xy, split_rooms_by_orditura, multi_slash_anisotropic, multi_slash_weighted, buffer_overlapping, clip_region_to_boundaries
+from cutting import multi_slash, flatten_voronoi, difference, flatten_single_level, to_polygon, unionized, fusion, point_in_polygon, polygon_in_polygon, segments_intersect, polygons_intersect, more_xy, split_rooms_by_orditura, multi_slash_anisotropic, multi_slash_weighted, buffer_overlapping, clip_region_to_boundaries
 
 from collections import defaultdict
 
@@ -116,84 +116,91 @@ for r_key, r_value in other_polylines.items():
     sub_other_data["tipo"] = "scale"
     other_data[r_key] = sub_other_data
 
-total_rooms_polylines = room_polylines# | stairs_polylines | other_polylines
-total_rooms_data = rooms_data# | stairs_data | other_data
+#total_rooms_polylines = room_polylines# | stairs_polylines | other_polylines
+#total_rooms_data = rooms_data# | stairs_data | other_data
 
-
-#with open("temp.JSON", "w") as f:
-    #json.dump(total_rooms_data, f, indent=2)
-        
-#DA CONTROLLARE SE CI SONO ELEMENTI O TESTI CHE NON SONO DENTRO LE POLILINEE PERIMETRALI
-
-#with open("data.JSON", "w") as f:
-    #json.dump(data, f, indent=2)
-
-
-############# M A I N - L O O P #############
 anisotropic = True
-
-total_rooms_polylines, total_rooms_data = split_rooms_by_orditura(total_rooms_polylines, total_rooms_data, struct_polylines)
-if anisotropic:
-    voronoi_areas = multi_slash_anisotropic(total_rooms_polylines, total_rooms_data, struct_polylines, stretch_factor=2.25)
-    #voronoi_areas = multi_slash_weighted(total_rooms_polylines, total_rooms_data, struct_polylines, weight_scale=2)
-else:
-    voronoi_areas = multi_slash(total_rooms_polylines, total_rooms_data, struct_polylines)
 
 struct_buffer_polygons = {}
 BUFFER = 30
 for key, value in struct_polylines.items():
     struct_buffer_polygons[key] = to_polygon(struct_polylines[key]["points"]).buffer(BUFFER,join_style="mitre",  mitre_limit=100)
-
-
-#fig1, ax1 = init_plot()
-#update_plot(ax, struct_buffer_polygons.values())
 truebuffer = buffer_overlapping(struct_polylines, struct_buffer_polygons)
 #update_plot(ax1, truebuffer.values(), pause=1)
 
 all_buffers = unionized(list(truebuffer.values()))
 
-struct_regions = {}
-for element in struct_polylines:
-    stuff = []
-    struct_poly = to_polygon(struct_polylines[element]["points"]) # -> qui potrei aggiungere l'area con offset
-    stuff.append(struct_poly)
-    stuff.append(truebuffer[element])
-    other_buffers = all_buffers.difference(truebuffer[element])
-    for room, cell_by_element in voronoi_areas.items():
-        for struct, cell in cell_by_element.items():
-            if struct == element:
-                cell = cell.difference(other_buffers)
-                stuff.append(cell)
-    struct_regions[element] = stuff
-
-#struct regions contiene l'elemento strutturale e tutte le celle voronoi ad esso associate
-region_polygons = {}
-# in pratica, arrivano gli elementi strutturali e le celle separate e unionized le unisce, poi fusion trasforma in multipoligoni in poligoni con meno intersezioni possibile
-# Quindi se voglio aggiungere o togliere qualcosa devo farlo qui?
-for struct, cells in struct_regions.items():
-    region_polygons[struct] = unionized(cells) ###################################################
-
-#update_plot(ax1, region_polygons.values(), pause=1)
-
-for key, value in region_polygons.items():    
-    region_polygons[key] = fusion(value)
+total_rooms_polylines_list = [room_polylines, stairs_polylines]#, other_polylines]
+total_rooms_data_list = [rooms_data, stairs_data]#, other_data]
+i = 0
 
 
-region_polygons = clip_region_to_boundaries(region_polygons, bound_polylines, struct_polylines)
+region_polygons_by_cat = {}
+############# M A I N - L O O P #############
 
-#update_plot(ax1, region_polygons.values())
-#show()
+for total_rooms_polylines, total_rooms_data in zip(total_rooms_polylines_list, total_rooms_data_list):
+    total_rooms_polylines, total_rooms_data = split_rooms_by_orditura(total_rooms_polylines, total_rooms_data, struct_polylines)
+    if anisotropic:
+        voronoi_areas = multi_slash_anisotropic(total_rooms_polylines, total_rooms_data, struct_polylines, stretch_factor=2.25)
+        #voronoi_areas = multi_slash_weighted(total_rooms_polylines, total_rooms_data, struct_polylines, weight_scale=2)
+    else:
+        voronoi_areas = multi_slash(total_rooms_polylines, total_rooms_data, struct_polylines)
 
-#voronoi_flat = flatten_voronoi(voronoi_areas)
+    #fig1, ax1 = init_plot()
+    #update_plot(ax, struct_buffer_polygons.values())
+    struct_regions = {}
+    if i < 1:
+        for element in struct_polylines:
+            stuff = []
+            struct_poly = to_polygon(struct_polylines[element]["points"])
+            stuff.append(struct_poly)
+            stuff.append(truebuffer[element])
+            other_buffers = all_buffers.difference(truebuffer[element])
+            for room, cell_by_element in voronoi_areas.items():
+                for struct, cell in cell_by_element.items():
+                    if struct == element:
+                        cell = cell.difference(other_buffers)
+                        stuff.append(cell)
+            struct_regions[element] = stuff
+    else:
+        for element in struct_polylines:
+            #print(list(total_rooms_data.values())[:])
+            if any(element in d["intersecano"] for d in list(total_rooms_data.values())):
+                stuff = []
+                struct_poly = to_polygon(struct_polylines[element]["points"])
+                stuff.append(struct_poly)
+                stuff.append(truebuffer[element])
+                other_buffers = all_buffers.difference(truebuffer[element])
+                for room, cell_by_element in voronoi_areas.items():
+                    for struct, cell in cell_by_element.items():
+                        if struct == element:
+                            cell = cell.difference(other_buffers)
+                            stuff.append(cell)
+                struct_regions[element] = stuff
+    #struct regions contiene l'elemento strutturale e tutte le celle voronoi ad esso associate
+    region_polygons = {}
+    # in pratica, arrivano gli elementi strutturali e le celle separate e unionized le unisce, poi fusion trasforma in multipoligoni in poligoni con meno intersezioni possibile
+    # Quindi se voglio aggiungere o togliere qualcosa devo farlo qui?
+    for struct, cells in struct_regions.items():
+        region_polygons[struct] = unionized(cells) ###################################################
 
+    #update_plot(ax1, region_polygons.values(), pause=1)
 
-for boundary, polygon in bound_polylines.items():
-    polygon = to_polygon(polygon["points"])
+    for key, value in region_polygons.items():    
+        region_polygons[key] = fusion(value)
 
-voronoi_flat = flatten_single_level(region_polygons)
+    region_polygons = clip_region_to_boundaries(region_polygons, bound_polylines, struct_polylines)
+    print(region_polygons)
+    #update_plot(ax1, region_polygons.values())
+    #show()
 
+    for boundary, polygon in bound_polylines.items():
+        polygon = to_polygon(polygon["points"])
 
-print(region_polygons)
+    voronoi_flat = flatten_single_level(region_polygons)
+    
+
+    i += 1
 
 plotting(bound_polylines=bound_polylines, struct_polylines=struct_polylines, mtexts=mtexts, voronoi=voronoi_flat)
 

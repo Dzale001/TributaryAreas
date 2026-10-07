@@ -264,6 +264,9 @@ def polygons_intersect(b_value, s_value):
 
     return False
 
+def difference(poly_1, poly_2):
+    return poly_1.difference(poly_2)
+
 def more_xy(points):
     # Valuta se un elemento è prevalente in direzione x o in direzione y
     if len(points) > 2:
@@ -570,6 +573,7 @@ def buffer_overlapping(struct_polylines, struct_buffer_polygons, fig=None, ax=No
                 false_polygon = result
         true_buffer_polygons[false_struct] = result
     #update_plot(ax, true_buffer_polygons.values())
+    
     diff_buffer = {}
     for id_1, polygon_1 in true_buffer_polygons.items():
         inter = []
@@ -607,3 +611,4 @@ def clip_region_to_boundaries(region_polygons, bound_polylines, struct_polylines
         clipped[element] = region.intersection(allowed_area)
 
     return clipped
+
