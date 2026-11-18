@@ -130,8 +130,8 @@ truebuffer = buffer_overlapping(struct_polylines, struct_buffer_polygons)
 
 all_buffers = unionized(list(truebuffer.values()))
 
-total_rooms_polylines_list = [room_polylines, stairs_polylines]#, other_polylines]
-total_rooms_data_list = [rooms_data, stairs_data]#, other_data]
+total_rooms_polylines_list = [room_polylines]#, stairs_polylines]#, other_polylines]
+total_rooms_data_list = [rooms_data]#, stairs_data]#, other_data]
 i = 0
 
 

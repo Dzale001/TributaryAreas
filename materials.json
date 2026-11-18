@@ -1,0 +1,214 @@
+[{
+    "Solai":{
+        "Laterocemento":{
+            "Solaio sp... + ..., int... 1": {
+                    "Altezza soletta":"",
+                    "Calcestruzzo":"input",
+                    "Densità calcestruzzo": "",
+                    "Altezza alleggerimento":"",
+                    "Altezza totale":"",
+                    "Interasse travetti": "",
+                    "Peso kg/m²":""},
+            "Solaio sp... + ..., int... 2": {
+                    "Altezza soletta":"",
+                    "Calcestruzzo":"",
+                    "Densità calcestruzzo": "",
+                    "Altezza alleggerimento":"",
+                    "Altezza totale":"",
+                    "Interasse travetti": "",
+                    "Peso kg/m²":""}
+        },
+        "Soletta piena":{
+            "Solaio": {
+                        "Spessore": "input",
+                        "Calcestruzzo":"input",
+                        "Densità calcestruzzo": "",
+                        "Peso kg/m²":""}
+        },
+        "Predalles":{
+            "Solaio sp... + ..., int... 1": {
+                    "Altezza soletta":"",
+                    "Calcestruzzo":"input",
+                    "Densità calcestruzzo": "",
+                    "Altezza alleggerimento":"",
+                    "Altezza totale":"",
+                    "Interasse travetti": "",
+                    "Peso kg/m²":""},
+            "Solaio sp... + ..., int... 2": {
+                    "Altezza soletta":"",
+                    "Calcestruzzo":"input",
+                    "Densità calcestruzzo": "",
+                    "Altezza alleggerimento":"",
+                    "Altezza totale":"",
+                    "Interasse travetti": "",
+                    "Peso kg/m²":""}
+        }
+    },
+    "Tavelle":{
+        "Tipo di tavella 1":{
+                    "Lunghezza": "",
+                    "Altezza": "",
+                    "Larghezza": "",
+                    "Peso kg/m²": ""},
+        "Tipo di tavella 2":{
+                    "Lunghezza": "",
+                    "Altezza": "",
+                    "Larghezza": "",
+                    "Peso kg/m²": ""}          
+    },
+    "Laterizi":{
+        "Tipo di laterizio 1":{
+                    "Lunghezza": "",
+                    "Altezza": "",
+                    "Larghezza": "",
+                    "Peso kg/m²": ""},
+        "Tipo di laterizio 2":{
+                    "Lunghezza": "",
+                    "Altezza": "",
+                    "Larghezza": "",
+                    "Peso kg/m²": ""}
+    },
+    "Massetto":{
+        "Massetto alleggerito":{
+                "Spessore":"input",
+                "Calcestruzzo":"input",
+                "Densità calcestruzzo": "",
+                "Peso kg/m²":""},
+        "Massetto cementizio":{
+                "Spessore":"input",
+                "Calcestruzzo":"input",
+                "Densità calcestruzzo": "",
+                "Peso kg/m²":""},
+        "Massetto industriale":{
+                "Spessore":"input",
+                "Calcestruzzo":"input",
+                "Densità calcestruzzo": "",
+                "Peso kg/m²":""},
+        "Massetto sabbia - cemento":{
+                "Spessore":"input",
+                "Calcestruzzo":"input",
+                "Densità calcestruzzo": "",
+                "Peso kg/m²":""},
+        "Massetto autolivellante":{
+                "Spessore":"input",
+                "Calcestruzzo":"input",
+                "Densità calcestruzzo": "",
+                "Peso kg/m²":""}
+    },
+    "Impianti":{
+        "Tipo di impianto 1": {
+            "Peso kg/m²":""
+        },
+        "Tipo di impianto 2": {
+            "Peso kg/m²":""
+        }
+    },
+    "Freno vapore":{
+        "Tipo di freno vapore 1": {
+            "Materiale": "",
+            "Spessore": "",
+            "Peso kg/m²":""
+        },
+        "Tipo di freno vapore 2": {
+            "Materiale": "",
+            "Spessore": "",
+            "Peso kg/m²":""
+        }
+    },
+    "Isolante":{
+        "Tipo di isolante 1": {
+            "Materiale": "",
+            "Spessore": "",
+            "Peso kg/m²":""
+        },
+        "Tipo di isolante 2": {
+            "Materiale": "",
+            "Spessore": "",
+            "Peso kg/m²":""
+        }
+    },
+    "Tegole":{
+        "Tipo di tegola 1": {
+            "Materiale": "",
+            "Spessore": "",
+            "Peso kg/m²":""
+        },
+        "Tipo di tegola 2": {
+            "Materiale": "",
+            "Spessore": "",
+            "Peso kg/m²":""
+        }
+    },
+    "Cordolo":{
+        "Calcestruzzo":"input",
+        "Densità calcestruzzo": "",
+        "Altezza":"input",
+        "Larghezza": "input",
+        "Peso kg/m²": ""
+    },
+    "Travi principali, legno":{
+        "Numero travi": "input",
+        "Legno": "input",
+        "Densità legno": "",
+        "Altezza": "input",
+        "Larghezza": "input",
+        "Peso kg/m²": ""
+    },
+    "Travi secondarie, legno":{
+        "Numero travi": "input",
+        "Legno": "input",
+        "Densità legno": "",
+        "Altezza": "input",
+        "Larghezza": "input",
+        "Peso kg/m²": ""
+    },
+    "Tavolato":{
+        "Materiale": "input",
+        "Densità legno": "",
+        "Spessore": "input",
+        "Peso kg/m²": ""
+    },
+    "Lamiera":{
+        "Tipo di lamiera 1":{
+            "Materiale": "input",
+            "Densità materiale": "",
+            "Spessore": "input",
+            "Peso kg/m²": ""
+        },
+        "Tipo di lamiera 2":{
+            "Materiale": "input",
+            "Densità materiale": "",
+            "Spessore": "input",
+            "Peso kg/m²": ""
+        }
+    },
+    "Intonaco":{
+        "Materiale": "input",
+        "Densità materiale": "",
+        "Spessore": "input",
+        "Peso kg/m²": ""
+    },
+    "Finitura":{
+        "Tipo di finitura 1": {
+            "Materiale": "input",
+            "Densità materiale": "",
+            "Spessore": "input",
+            "Peso kg/m²": ""
+        },
+        "Tipo di finitura 2": {
+            "Materiale": "input",
+            "Densità materiale": "",
+            "Spessore": "input",
+            "Peso kg/m²": ""
+        }
+    },
+    "Sovraccarico":{
+        "Ambienti ad uso residenziale - Aree per attività domestiche":{
+            "Peso kg/m²":""
+        },
+        "Ambienti ad uso residenziale - Scale comuni, balconi, ballatoi":{
+            "Peso kg/m²":""
+        }
+    }
+
+}]
