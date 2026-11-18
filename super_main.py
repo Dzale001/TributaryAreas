@@ -2,7 +2,7 @@
 import ezdxf
 import math
 import pandas as pd
-from plotting import *
+#from plotting import *
 from shapely.geometry import Point, Polygon, LineString, MultiPoint, MultiPolygon, GeometryCollection, box
 from shapely.affinity import scale as affine_scale
 from shapely.ops import voronoi_diagram, unary_union, split

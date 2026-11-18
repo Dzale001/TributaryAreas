@@ -1,22 +1,52 @@
 import sys
 import zlib
+import os
 
 from PySide6.QtCore import Qt, QRectF, QPointF
 from PySide6.QtGui import (
-    QPainter, QColor, QPen, QBrush, QPolygonF, QPalette, QFontMetrics
+    QPainter, QColor, QPen, QBrush, QPolygonF, QPalette, QFontMetrics, QIcon
 )
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QSizePolicy,
+    QApplication, QMainWindow, QWidget, QSizePolicy, QScrollArea,
     QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QComboBox, QDoubleSpinBox,
     QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QMessageBox, QGroupBox
+    QHeaderView, QMessageBox, QGroupBox, QPlainTextEdit
 )
 
 from database_materiali import DATABASE
+from pannelli_clima import PannelloNeve, PannelloVento
 
 G = 9.81  # m/s²
 
+# azioni climatiche: non sono strati fisici e hanno un risultato in kN/m²
+METODI_CLIMA = ("neve", "vento")
+TIPI_NON_FISICI = ("sovraccarico", "neve", "vento")
+import os
+
+BASE_ICON = os.path.join(os.path.dirname(__file__), "pngs")
+
+ICONA_CATEGORIE = {
+    "Cordoli": "cordoli.png", #
+    "Solai": "solai.png", #
+    "Lamiera": "lamiere.png", #
+    "Impianti": "impianti.png", #
+    "Intonaco": "intonaco.png", #
+    "Tegole": "tegole.png", #
+    "Travi principali legno": "travi.png", #
+    "Travi secondarie legno": "travi.png", #
+    "Laterizi":"laterizi.png", #
+    "Freno vapore": "freno_vapore.png", #
+    "Isolanti": "isolanti.png", #
+    "Finiture": "finiture.png", #
+    "Sovraccarico": "sovraccarichi.png", #
+    "Massetti": "massetto.png", #
+    "Neve": "neve.png", #
+    "Tavelle": "tavelle.png", #
+    "Tavolato": "tavolato.png", #
+    "Travi acciaio": "travi_acciaio.png",
+    "Vento": "vento.png"
+}
 
 class StratigrafiaWidget(QWidget):
     """Disegno schematico (non in scala) della stratigrafia, dall'alto verso il basso."""
@@ -87,10 +117,16 @@ class StratigrafiaWidget(QWidget):
 
         fisici = [
             (i, s) for i, s in enumerate(self.strati)
-            if s.get("tipo_disegno") != "sovraccarico"
+            if s.get("tipo_disegno") not in TIPI_NON_FISICI
         ]
         carichi = [
             s for s in self.strati if s.get("tipo_disegno") == "sovraccarico"
+        ]
+        carichi_neve = [
+            s for s in self.strati if s.get("tipo_disegno") == "neve"
+        ]
+        carichi_vento = [
+            s for s in self.strati if s.get("tipo_disegno") == "vento"
         ]
 
         font_piccolo = self.font()
@@ -99,20 +135,37 @@ class StratigrafiaWidget(QWidget):
         fm = QFontMetrics(font_piccolo)
 
         y = margine
+        larg_testo = self.width() - 2 * margine
 
-        # ---- sovraccarichi: frecce sopra la stratigrafia ----
+        # ---- sovraccarichi e neve: frecce sopra la stratigrafia ----
+        righe_testo = []
         if carichi:
             q = sum(c["valore"] for c in carichi)
-            p.setPen(colore_testo)
+            righe_testo.append(f"Sovraccarico q = {q:.2f} kN/m²")
+        if carichi_neve:
+            qs = max(c["valore"] for c in carichi_neve)
+            righe_testo.append(f"Neve qs = {qs:.2f} kN/m²")
+        for c in carichi_vento:
+            righe_testo.append(fm.elidedText(
+                f'{c["prodotto"]}: {c["valore"]:+.3f} kN/m²',
+                Qt.TextElideMode.ElideRight, larg_testo
+            ))
+
+        p.setPen(colore_testo)
+        for riga in righe_testo:
             p.drawText(
-                QRectF(x0, y, self.width() - 2 * margine, fm.height()),
+                QRectF(x0, y, larg_testo, fm.height()),
                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                f"Sovraccarico q = {q:.2f} kN/m²"
+                riga
             )
-            y_freccia_in = y + fm.height() + 2
+            y += fm.height() + 1
+
+        if carichi or carichi_neve:
+            colore_freccia = QColor(200, 60, 60) if carichi else QColor(60, 110, 200)
+            y_freccia_in = y + 2
             y_freccia_fin = y_freccia_in + 22
-            p.setPen(QPen(QColor(200, 60, 60), 1.5))
-            p.setBrush(QColor(200, 60, 60))
+            p.setPen(QPen(colore_freccia, 1.5))
+            p.setBrush(colore_freccia)
             for k in range(6):
                 xf = x0 + (k + 0.5) * larg_sez / 6
                 p.drawLine(QPointF(xf, y_freccia_in), QPointF(xf, y_freccia_fin - 4))
@@ -122,6 +175,8 @@ class StratigrafiaWidget(QWidget):
                     QPointF(xf, y_freccia_fin),
                 ]))
             y = y_freccia_fin + 6
+        elif righe_testo:
+            y += 4
 
         # ---- strati ----
         basso = self.height() - margine - fm.height() - 4
@@ -219,6 +274,7 @@ class LoadViewer(QMainWindow):
         self.resize(1250, 850)
 
         self.strati = []
+        self._dim_clima = "-"      # descrizione dell'ultimo calcolo neve/vento
 
         self.crea_interfaccia()
         self.aggiorna_categorie()
@@ -252,9 +308,20 @@ class LoadViewer(QMainWindow):
 
     def crea_interfaccia(self):
 
+        # finestra divisa in due: a sinistra (3/4) la definizione dei carichi,
+        # a destra (1/4) i risultati
+        contenitore = QWidget()
+        divisione = QHBoxLayout(contenitore)
+        self.setCentralWidget(contenitore)
+
         centrale = QWidget()
-        self.setCentralWidget(centrale)
         layout = QVBoxLayout(centrale)
+
+        # sinistra in scroll area: i pannelli neve/vento sono alti
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(centrale)
+        divisione.addWidget(scroll, 3)
 
         # ---------- SELEZIONE MATERIALE ----------
         gruppo = QGroupBox("Selezione materiale")
@@ -262,6 +329,7 @@ class LoadViewer(QMainWindow):
         self.form = form
 
         self.categoria = QComboBox()
+        self.categoria.setInsertPolicy(QComboBox.InsertPolicy.InsertAlphabetically)
         self.tipo = QComboBox()
         self.produttore = QComboBox()
         self.prodotto = QComboBox()
@@ -295,11 +363,10 @@ class LoadViewer(QMainWindow):
         form.addRow("Larghezza elemento (b):", self.larghezza_elemento)
         form.addRow("Altezza elemento (h):", self.altezza_elemento)
 
-        # Numero elementi (solo elementi lineari tipo cordoli)
+        # Numero elementi (cordoli, profili singoli)
         self.numero_elementi = self._spin(1, 1000, 0, 1)
         form.addRow("Numero elementi:", self.numero_elementi)
 
-        # Peso al metro del singolo profilo (travi in acciaio)
         # Profili in acciaio: peso al metro + modalità di calcolo
         self.modo_profilo = QComboBox()
         self.modo_profilo.addItems([
@@ -343,6 +410,14 @@ class LoadViewer(QMainWindow):
 
         layout.addWidget(gruppo)
 
+        # ---------- PANNELLI NEVE / VENTO ----------
+        self.pannello_neve = PannelloNeve()
+        self.pannello_vento = PannelloVento()
+        for pannello in (self.pannello_neve, self.pannello_vento):
+            pannello.setVisible(False)
+            pannello.cambiato.connect(self.calcola_peso)
+            layout.addWidget(pannello)
+
         # ---------- PULSANTE AGGIUNGI ----------
         self.btn_aggiungi = QPushButton("Aggiungi materiale alla stratigrafia")
         self.btn_aggiungi.clicked.connect(self.aggiungi_materiale)
@@ -350,6 +425,7 @@ class LoadViewer(QMainWindow):
 
         # ---------- TABELLA STRATI ----------
         self.tabella = QTableWidget(0, 6)
+        self.tabella.setMinimumHeight(220)
         self.tabella.setHorizontalHeaderLabels([
             "Categoria", "Materiale", "Dimensioni",
             "Valore", "Unità", "Fonte"
@@ -387,8 +463,10 @@ class LoadViewer(QMainWindow):
         # ---------- RISULTATI ----------
         gruppo_finale = QGroupBox("Risultati")
         finale = QFormLayout(gruppo_finale)
+        finale.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
 
         self.totale_kg = QLabel("0 kg/m²")
+        self.peso_permanenti = QLabel("0 kg/m²")
         self.totale_kn = QLabel("0 kN/m²")
 
         self.larghezza = self._spin(0.01, 100, 2, 1.0, " m")
@@ -398,16 +476,30 @@ class LoadViewer(QMainWindow):
         self.peso_lineare = QLabel("0 kg/m")
         self.sovraccarico = QLabel("0 kN/m²")
         self.carico_permanente = QLabel("0 kN/m")
+        self.neve_label = QLabel("0 kN/m²")
+        self.neve_lineare = QLabel("0 kN/m")
+        # elenco delle pressioni del vento: casella di testo in sola lettura
+        self.vento_label = QPlainTextEdit("-")
+        self.vento_label.setReadOnly(True)
+        self.vento_label.setMinimumHeight(130)
 
-        finale.addRow("Peso totale:", self.totale_kg)
+        finale.addRow("Peso totale (permanenti + sovraccarico):", self.totale_kg)
+        finale.addRow("di cui permanenti (G):", self.peso_permanenti)
         finale.addRow("Carico superficiale:", self.totale_kn)
         finale.addRow("Larghezza di influenza:", self.larghezza)
         finale.addRow("Carico lineare:", self.carico_lineare)
         finale.addRow("Peso elementi lineari:", self.peso_lineare)
         finale.addRow("Sovraccarico:", self.sovraccarico)
         finale.addRow("Carico permanente lineare:", self.carico_permanente)
+        finale.addRow("Neve (qs):", self.neve_label)
+        finale.addRow("Neve lineare (qs · larghezza):", self.neve_lineare)
+        finale.addRow("Vento (pressioni):", self.vento_label)
 
-        layout.addWidget(gruppo_finale)
+        # destra: risultati (sempre visibili, con scroll se serve)
+        scroll_risultati = QScrollArea()
+        scroll_risultati.setWidgetResizable(True)
+        scroll_risultati.setWidget(gruppo_finale)
+        divisione.addWidget(scroll_risultati, 1)
 
         self.aggiorna_abilitazioni(None)
 
@@ -417,7 +509,16 @@ class LoadViewer(QMainWindow):
 
     def aggiorna_categorie(self):
         self.categoria.clear()
-        self.categoria.addItems(DATABASE.keys())
+
+        for categoria in sorted(DATABASE.keys()):
+            nome_icona = ICONA_CATEGORIE.get(categoria)
+
+            if nome_icona:
+                percorso = os.path.join(BASE_ICON, nome_icona)
+                icona = QIcon(percorso)
+                self.categoria.addItem(icona, categoria)
+            else:
+                self.categoria.addItem(categoria)
 
     def aggiorna_tipi(self):
         self.tipo.clear()
@@ -496,6 +597,10 @@ class LoadViewer(QMainWindow):
         self.modo_interasse.setEnabled(usa_interasse)
         self.valore_interasse.setEnabled(usa_interasse)
 
+        # pannelli delle azioni climatiche
+        self.pannello_neve.setVisible(metodo == "neve")
+        self.pannello_vento.setVisible(metodo == "vento")
+
     def aggiorna_dati(self):
 
         materiale = self.get_materiale()
@@ -512,11 +617,17 @@ class LoadViewer(QMainWindow):
         if metodo in ("densita", "dimensionale", "travi", "muri"):
             self._imposta(self.densita, materiale["densita"])
 
+        # sovraccarichi e pesi fissi: il database e il campo sono in kg/m²
         if self._e_sovraccarico(materiale) or metodo == "fisso":
             self._imposta(self.peso_fisso, materiale["peso"], " kg/m²")
 
         if metodo == "profilo":
             self._imposta(self.peso_profilo, materiale["peso_lineare"])
+
+        if metodo == "neve":
+            self.pannello_neve.imposta_voce(materiale)
+        elif metodo == "vento":
+            self.pannello_vento.imposta_voce(materiale)
 
         self.fonte_label.setText(materiale.get("fonte", "Non specificata"))
         self.calcola_peso()
@@ -549,10 +660,11 @@ class LoadViewer(QMainWindow):
     # -------------------------------------------------
     # TRAVI / MURI: INTERASSE <-> N. ELEMENTI AL METRO
     # -------------------------------------------------
+
     def cambia_modo_profilo(self):
         self.aggiorna_abilitazioni(self.get_materiale())
         self.calcola_peso()
-    
+
     def cambia_modo_interasse(self):
         """Converte il valore mantenendo l'equivalenza fisica."""
         corrente = self.valore_interasse.value()
@@ -603,6 +715,16 @@ class LoadViewer(QMainWindow):
             # il database e il campo sono in kg/m²: converto in kN/m²
             valore = self.peso_fisso.value() * G / 1000
             unita = "kN/m²"
+
+        elif metodo in METODI_CLIMA:
+            pannello = self.pannello_neve if metodo == "neve" else self.pannello_vento
+            risultato = pannello.calcola(materiale)
+            if risultato is None:
+                self.peso_label.setText("-")
+                return None
+            valore = risultato["valore"]
+            unita = "kN/m²"
+            self._dim_clima = risultato["dimensioni"]
 
         elif metodo == "fisso":
             valore = self.peso_fisso.value()
@@ -665,7 +787,8 @@ class LoadViewer(QMainWindow):
         else:
             return None
 
-        self.peso_label.setText(f"{valore:.2f} {unita}")
+        decimali = 3 if unita == "kN/m²" else 2
+        self.peso_label.setText(f"{valore:.{decimali}f} {unita}")
         return valore, unita
 
     # -------------------------------------------------
@@ -677,7 +800,9 @@ class LoadViewer(QMainWindow):
         risultato = self.calcola_peso()
         if risultato is None:
             QMessageBox.warning(
-                self, "Attenzione", "Seleziona un materiale valido."
+                self, "Attenzione",
+                "Seleziona un materiale valido (per neve e vento controlla "
+                "i parametri del pannello: messaggio in rosso/⚠)."
             )
             return
 
@@ -728,6 +853,9 @@ class LoadViewer(QMainWindow):
                 dimensioni = f"{base}, interasse {self.interasse_m() * 100:.1f} cm"
             else:
                 dimensioni = f"{base} (n. {int(self.numero_elementi.value())})"
+
+        elif metodo in METODI_CLIMA:
+            dimensioni = self._dim_clima
         else:
             dimensioni = "-"
 
@@ -746,7 +874,8 @@ class LoadViewer(QMainWindow):
         riga = self.tabella.rowCount()
         self.tabella.insertRow(riga)
 
-        valori = [categoria, nome, dimensioni, f"{valore:.2f}", unita, fonte]
+        decimali = 3 if unita == "kN/m²" else 2
+        valori = [categoria, nome, dimensioni, f"{valore:.{decimali}f}", unita, fonte]
         for colonna, dato in enumerate(valori):
             self.tabella.setItem(riga, colonna, QTableWidgetItem(str(dato)))
 
@@ -757,8 +886,18 @@ class LoadViewer(QMainWindow):
         else:
             tipo_calcolo = "superficiale"
 
+        # tipo di azione (serve per sommare correttamente i totali)
+        if metodo in METODI_CLIMA:
+            azione = metodo
+        elif unita == "kN/m²":
+            azione = "sovraccarico"
+        else:
+            azione = None
+
         # dati per il disegno schematico
-        if tipo_calcolo == "sovraccarico":
+        if metodo in METODI_CLIMA:
+            tipo_disegno, spessore_cm = metodo, 0.0
+        elif tipo_calcolo == "sovraccarico":
             tipo_disegno, spessore_cm = "sovraccarico", 0.0
         elif metodo == "densita":
             tipo_disegno, spessore_cm = "continuo", self.spessore.value()
@@ -779,9 +918,11 @@ class LoadViewer(QMainWindow):
         self.strati.append({
             "nome": nome,
             "etichetta": f"{categoria}: {self.prodotto.currentText()}",
+            "prodotto": self.prodotto.currentText(),
             "categoria": categoria,
             "valore": valore,
             "unita": unita,
+            "azione": azione,
             "tipo_calcolo": tipo_calcolo,
             "tipo_disegno": tipo_disegno,
             "spessore_cm": spessore_cm,
@@ -819,12 +960,19 @@ class LoadViewer(QMainWindow):
         totale_kg_m2 = 0.0
         totale_kg_m = 0.0
         totale_q_kn_m2 = 0.0
+        neve_max = 0.0              # le voci neve sono alternative: si prende la maggiore
+        righe_vento = []
 
         for elemento in self.strati:
             valore = elemento["valore"]
             unita = elemento["unita"]
+            azione = elemento.get("azione")
 
-            if unita == "kg/m²":
+            if azione == "neve":
+                neve_max = max(neve_max, valore)
+            elif azione == "vento":
+                righe_vento.append(f'{elemento["prodotto"]}: {valore:+.3f} kN/m²')
+            elif unita == "kg/m²":
                 totale_kg_m2 += valore
             elif unita == "kg/m":
                 totale_kg_m += valore
@@ -842,12 +990,18 @@ class LoadViewer(QMainWindow):
         g_totale_lineare = carico_superficiale_lineare + g_lineare
         totale_lineare = g_totale_lineare + q_lineare
 
-        self.totale_kg.setText(f"{totale_kg_m2:.2f} kg/m²")
+        # il sovraccarico (kN/m²) viene riportato in kg/m² equivalenti
+        sovraccarico_kg_m2 = totale_q_kn_m2 * 1000 / G
+        self.totale_kg.setText(f"{totale_kg_m2 + sovraccarico_kg_m2:.2f} kg/m²")
+        self.peso_permanenti.setText(f"{totale_kg_m2:.2f} kg/m²")
         self.totale_kn.setText(f"{g_superficiale:.3f} kN/m²")
         self.carico_lineare.setText(f"{totale_lineare:.3f} kN/m")
         self.peso_lineare.setText(f"{totale_kg_m:.2f} kg/m")
         self.sovraccarico.setText(f"{totale_q_kn_m2:.2f} kN/m²")
         self.carico_permanente.setText(f"{g_totale_lineare:.3f} kN/m")
+        self.neve_label.setText(f"{neve_max:.3f} kN/m²")
+        self.neve_lineare.setText(f"{neve_max * larghezza:.3f} kN/m")
+        self.vento_label.setPlainText("\n".join(righe_vento) if righe_vento else "-")
 
 
 if __name__ == "__main__":

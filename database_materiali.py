@@ -1124,3 +1124,6 @@ DATABASE["Travi acciaio"] = {
         }
     },
 }
+
+from azioni_climatiche import VOCI_CLIMATICHE
+DATABASE.update(VOCI_CLIMATICHE)
